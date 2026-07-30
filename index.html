@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Dash × Minecraft — лёгкий уровень</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-wrapper {
+            background: #2d2d2d;
+            padding: 20px 30px 30px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 0 #1a1a1a, 0 15px 30px rgba(0, 0, 0, 0.7);
+            border: 4px solid #6b6b6b;
+        }
+
+        .canvas-container {
+            background: #8b8b8b;
+            padding: 8px;
+            border-radius: 16px;
+            box-shadow: inset 0 -6px 0 #5a5a5a, 0 0 0 4px #3d3d3d;
+        }
+
+        canvas {
+            display: block;
+            width: 800px;
+            height: 400px;
+            background: #6b8cff;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            border-radius: 8px;
+            box-shadow: inset 0 0 0 2px #4a4a4a;
+            cursor: pointer;
+        }
+
+        .panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 18px;
+            padding: 8px 14px;
+            background: #6b6b6b;
+            border-radius: 40px;
+            border: 4px solid #4a4a4a;
+            box-shadow: inset 0 4px 0 #8f8f8f, 0 6px 0 #2d2d2d;
+        }
+
+        .info {
+            display: flex;
+            gap: 28px;
+            color: #f0f0f0;
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 3px 3px 0 #1a1a1a;
+            letter-spacing: 1px;
+        }
+
+        .info span {
+            background: #3d3d3d;
+            padding: 6px 18px;
+            border-radius: 30px;
+            border: 3px solid #2a2a2a;
+            box-shadow: inset 0 -4px 0 #1f1f1f;
+        }
+
+        button {
+            background: #c6a86b;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2d2d2d;
+            text-shadow: 2px 2px 0 #b38b4b;
+            border-bottom: 6px solid #8f6f3a;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 4px 0 #3d2b1a;
+            letter-spacing: 2px;
+        }
+
+        button:active {
+            transform: translateY(5px);
+            border-bottom-width: 2px;
+            box-shadow: 0 1px 0 #3d2b1a;
+        }
+
+        button:hover {
+            background: #dbb87a;
+        }
+
+        .hint {
+            color: #c4c4c4;
+            font-size: 18px;
+            background: #3d3d3d;
+            padding: 4px 18px;
+            border-radius: 40px;
+            border: 3px solid #2a2a2a;
+            box-shadow: inset 0 -4px 0 #1f1f1f;
+        }
+
+        @media (max-width: 880px) {
+            canvas {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 2 / 1;
+            }
+            .game-wrapper {
+                padding: 15px;
+                width: 95vw;
+            }
+            .info {
+                font-size: 18px;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            button {
+                font-size: 20px;
+                padding: 6px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper">
+    <div class="canvas-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+    </div>
+    <div class="panel">
+        <div class="info">
+            <span>🏆 <span id="scoreDisplay">0</span></span>
+            <span>⏺ <span id="platformCount">3</span></span>
+            <span>🔄 <span id="jumpDisplay">2</span></span>
+            <span>💨 <span id="dashDisplay">✓</span></span>
+        </div>
+        <button id="resetBtn">⟳ Рестарт</button>
+        <div class="hint">␣/клик — прыжок | F — рывок</div>
+    </div>
+</div>
+<script>
+    (function() {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreDisplay');
+        const platformSpan = document.getElementById('platformCount');
+        const jumpSpan = document.getElementById('jumpDisplay');
+        const dashSpan = document.getElementById('dashDisplay');
+
+        // --- Параметры игры ---
+        const GRAVITY = 0.45;
+        const JUMP_FORCE = -8.2;
+        const DOUBLE_JUMP_FORCE = -7.2;
+        const PLAYER_SIZE = 26;
+        const GROUND_Y = 360;
+        const SCROLL_SPEED = 2.5;
+        const MAX_JUMPS = 2;
+        const DASH_DISTANCE = 60;
+        const DASH_COOLDOWN = 40;
+
+        function calculateMaxJumpDistance() {
+            const jumpTime = 2 * Math.abs(JUMP_FORCE) / GRAVITY;
+            const singleJumpDist = SCROLL_SPEED * jumpTime * 0.85;
+            const doubleJumpDist = SCROLL_SPEED * (jumpTime + Math.abs(DOUBLE_JUMP_FORCE) / GRAVITY * 2) * 0.85;
+            return {
+                single: singleJumpDist,
+                double: doubleJumpDist,
+                safeSingle: singleJumpDist * 0.85,
+                safeDouble: doubleJumpDist * 0.85
+            };
+        }
+
+        const jumpDist = calculateMaxJumpDistance();
+
+        // --- Состояние ---
+        let player = {
+            x: 130,
+            y: GROUND_Y - PLAYER_SIZE,
+            vy: 0,
+            width: PLAYER_SIZE,
+            height: PLAYER_SIZE,
+            jumpsLeft: MAX_JUMPS
+        };
+
+        let platforms = [];
+        let score = 0;
+        let gameOver = false;
+        let frameId = null;
+        let platformCounter = 0;
+        
+        let dashCooldown = 0;
+        let dashAvailable = true;
+        let dashEffectTimer = 0;
+        let dashActive = false;      // флаг, что рывок активен
+
+        // --- Генерация платформ ---
+        function generatePlatforms() {
+            const newPlatforms = [];
+            
+            newPlatforms.push({
+                x: 50,
+                y: GROUND_Y - 8,
+                width: 100,
+                height: 12,
+                color: '#6a9e6a',
+                isStart: true
+            });
+
+            let lastX = 50 + 100;
+            const platformCount = 8 + Math.floor(Math.random() * 3);
+            const minGap = 20;
+            const maxGap = Math.floor(jumpDist.safeDouble * 0.7);
+            
+            for (let i = 0; i < platformCount; i++) {
+                let gap = minGap + Math.random() * (maxGap * 0.6);
+                
+                if (Math.random() > 0.85 && i > 3) {
+                    gap = maxGap * 0.5 + Math.random() * (maxGap * 0.3);
+                }
+                
+                const x = lastX + gap;
+                
+                let y = GROUND_Y - 8;
+                const heightRoll = Math.random();
+                if (heightRoll < 0.2) {
+                    y = GROUND_Y - 8 - 12;
+                } else if (heightRoll < 0.5) {
+                    y = GROUND_Y - 8 - 4;
+                } else if (heightRoll < 0.8) {
+                    y = GROUND_Y - 8 + 4;
+                } else {
+                    y = GROUND_Y - 8 + 12;
+                }
+                y = Math.min(Math.max(y, GROUND_Y - 40), GROUND_Y + 18);
+                
+                let width = 45 + Math.floor(Math.random() * 25);
+                
+                if (Math.random() > 0.9 && i > 4) {
+                    width = 30 + Math.floor(Math.random() * 10);
+                }
+                
+                const heightDiff = Math.abs(y - (GROUND_Y - 8));
+                let adjustedGap = gap;
+                if (heightDiff > 15) {
+                    adjustedGap = gap * 0.85;
+                }
+                
+                const isTrap = Math.random() > 0.95 && i > 4;
+                
+                newPlatforms.push({
+                    x: x,
+                    y: y,
+                    width: isTrap ? 25 + Math.floor(Math.random() * 10) : width,
+                    height: 12,
+                    color: isTrap ? '#8b3a3a' : `hsl(${40 + Math.floor(Math.random() * 30)}, 50%, 42%)`,
+                    isTrap: isTrap,
+                    gap: adjustedGap
+                });
+                lastX = x + width;
+            }
+
+            const finishGap = 40 + Math.random() * 40;
+            newPlatforms.push({
+                x: lastX + finishGap,
+                y: GROUND_Y - 8,
+                width: 80,
+                height: 16,
+                color: '#5f7a4a',
+                isFinish: true
+            });
+
+            return newPlatforms;
+        }
+
+        function placePlayerOnStartPlatform() {
+            const startPlat = platforms.find(p => p.isStart === true);
+            if (startPlat) {
+                player.x = startPlat.x + 20;
+                player.y = startPlat.y - PLAYER_SIZE + 1;
+                player.vy = 0;
+                player.jumpsLeft = MAX_JUMPS;
+            } else {
+                player.x = 130;
+                player.y = GROUND_Y - PLAYER_SIZE;
+                player.vy = 0;
+                player.jumpsLeft = MAX_JUMPS;
+            }
+            updateJumpUI();
+        }
+
+        function initGame() {
+            platforms = generatePlatforms();
+            placePlayerOnStartPlatform();
+            score = 0;
+            gameOver = false;
+            platformCounter = 0;
+            dashCooldown = 0;
+            dashAvailable = true;
+            dashEffectTimer = 0;
+            dashActive = false;
+            updateUI();
+        }
+
+        function updateUI() {
+            scoreSpan.textContent = Math.floor(score);
+            platformSpan.textContent = platforms.length;
+            updateJumpUI();
+            updateDashUI();
+        }
+
+        function updateJumpUI() {
+            jumpSpan.textContent = player.jumpsLeft;
+        }
+
+        function updateDashUI() {
+            dashSpan.textContent = dashAvailable ? '✓' : '⏳';
+            dashSpan.style.color = dashAvailable ? '#7cfc7c' : '#ff6666';
+        }
+
+        // --- Обновление логики ---
+        function updateGame() {
+            if (gameOver) return;
+
+            // Обновление кулдауна рывка
+            if (!dashAvailable) {
+                dashCooldown--;
+                if (dashCooldown <= 0) {
+                    dashAvailable = true;
+                    updateDashUI();
+                }
+            }
+            
+            if (dashEffectTimer > 0) {
+                dashEffectTimer--;
+            }
+
+            // Движение платформ
+            for (let p of platforms) {
+                p.x -= SCROLL_SPEED;
+            }
+
+            // Гравитация
+            player.vy += GRAVITY;
+            player.y += player.vy;
+
+            // Столкновения с платформами
+            let onGround = false;
+            let landedOnFinish = false;
+
+            for (let i = 0; i < platforms.length; i++) {
+                const p = platforms[i];
+                if (player.vy >= 0 &&
+                    player.x + player.width > p.x + 4 &&
+                    player.x < p.x + p.width - 4 &&
+                    player.y + player.height >= p.y &&
+                    player.y + player.height <= p.y + p.height + 6) {
+                    player.y = p.y - player.height;
+                    player.vy = 0;
+                    onGround = true;
+                    
+                    player.jumpsLeft = MAX_JUMPS;
+                    updateJumpUI();
+                    
+                    if (p.isFinish) {
+                        landedOnFinish = true;
+                    }
+                    if (p.x + p.width < player.x - 20 && !p.scored && !p.isFinish) {
+                        p.scored = true;
+                        score += 10;
+                        updateUI();
+                    }
+                    break;
+                }
+            }
+
+            // Касание сверху
+            if (!onGround) {
+                for (let i = 0; i < platforms.length; i++) {
+                    const p = platforms[i];
+                    if (player.vy < 0 &&
+                        player.x + player.width > p.x + 4 &&
+                        player.x < p.x + p.width - 4 &&
+                        player.y <= p.y + p.height &&
+                        player.y + player.height >= p.y) {
+                        player.y = p.y + p.height;
+                        player.vy = 0.5;
+                        break;
+                    }
+                }
+            }
+
+            // Падение вниз
+            if (player.y > canvas.height + 30) {
+                gameOver = true;
+                return;
+            }
+
+            // Ограничение по верху
+            if (player.y < -50) {
+                player.y = -50;
+                player.vy = 0.5;
+            }
+
+            // Удаление платформ
+            platforms = platforms.filter(p => p.x + p.width > -30);
+
+            // Генерация новых платформ
+            const lastPlatform = platforms[platforms.length - 1];
+            if (lastPlatform && lastPlatform.x < 700) {
+                const minGap = 20;
+                const maxGap = Math.floor(jumpDist.safeDouble * 0.7);
+                
+                let gap = minGap + Math.random() * (maxGap * 0.6);
+                
+                if (Math.random() > 0.9 && platformCounter > 5) {
+                    gap = maxGap * 0.5 + Math.random() * (maxGap * 0.3);
+                }
+                
+                let y = GROUND_Y - 8;
+                const heightRoll = Math.random();
+                if (heightRoll < 0.2) {
+                    y = GROUND_Y - 8 - 12;
+                } else if (heightRoll < 0.5) {
+                    y = GROUND_Y - 8 - 4;
+                } else if (heightRoll < 0.8) {
+                    y = GROUND_Y - 8 + 4;
+                } else {
+                    y = GROUND_Y - 8 + 12;
+                }
+                y = Math.min(Math.max(y, GROUND_Y - 40), GROUND_Y + 18);
+                
+                const heightDiff = Math.abs(y - (GROUND_Y - 8));
+                if (heightDiff > 15) {
+                    gap = gap * 0.85;
+                }
+                
+                const newX = lastPlatform.x + lastPlatform.width + gap;
+                
+                let width = 45 + Math.floor(Math.random() * 25);
+                if (Math.random() > 0.9 && platformCounter > 4) {
+                    width = 30 + Math.floor(Math.random() * 10);
+                }
+                
+                const isTrap = Math.random() > 0.95 && platformCounter > 5;
+                
+                const newPlat = {
+                    x: newX,
+                    y: y,
+                    width: isTrap ? 25 + Math.floor(Math.random() * 10) : width,
+                    height: 12,
+                    color: isTrap ? '#8b3a3a' : `hsl(${35 + Math.floor(Math.random() * 35)}, 45%, 42%)`,
+                    isTrap: isTrap
+                };
+                platforms.push(newPlat);
+                platformCounter++;
+                updateUI();
+
+                if (platformCounter > 20 && Math.random() > 0.85) {
+                    const finishGap = 40 + Math.random() * 50;
+                    const finishX = newX + width + finishGap;
+                    platforms.push({
+                        x: finishX,
+                        y: GROUND_Y - 8,
+                        width: 80,
+                        height: 16,
+                        color: '#5f7a4a',
+                        isFinish: true
+                    });
+                }
+            }
+
+            if (landedOnFinish) {
+                gameOver = true;
+            }
+
+            if (player.x < 0) {
+                player.x = 0;
+            }
+            
+            // Ограничение справа, чтобы игрок не вылетал за экран
+            if (player.x + player.width > canvas.width) {
+                player.x = canvas.width - player.width;
+            }
+        }
+
+        // --- ИСПРАВЛЕННЫЙ РЫВОК ---
+        function dash() {
+            if (gameOver) return;
+            if (!dashAvailable) return;
+            
+            // Сохраняем текущую позицию
+            const oldX = player.x;
+            
+            // Перемещаем игрока вперёд
+            player.x += DASH_DISTANCE;
+            
+            // Проверяем, не оказался ли игрок внутри платформы
+            for (let p of platforms) {
+                // Если игрок пересекает платформу по горизонтали
+                if (player.x + player.width > p.x + 2 && 
+                    player.x < p.x + p.width - 2) {
+                    // Если игрок находится на уровне платформы по вертикали
+                    if (player.y + player.height > p.y && 
+                        player.y < p.y + p.height) {
+                        // Откатываем назад или ставим на платформу
+                        if (player.vy >= 0) {
+                            // Если падаем — ставим на платформу
+                            player.y = p.y - player.height;
+                            player.vy = 0;
+                            player.jumpsLeft = MAX_JUMPS;
+                            updateJumpUI();
+                        } else {
+                            // Если летим вверх — отталкиваем
+                            player.y = p.y + p.height;
+                            player.vy = 0.5;
+                        }
+                        // Не даём пройти сквозь
+                        break;
+                    }
+                }
+            }
+            
+            // Проверяем, не улетел ли игрок слишком далеко вправо
+            if (player.x + player.width > canvas.width) {
+                player.x = canvas.width - player.width;
+            }
+            
+            // Активируем кулдаун
+            dashAvailable = false;
+            dashCooldown = DASH_COOLDOWN;
+            dashEffectTimer = 15;
+            updateDashUI();
+            
+            // Визуальный эффект
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(oldX + DASH_DISTANCE/2, player.y + player.height/2, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- Отрисовка ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#4a8cff');
+            gradient.addColorStop(0.65, '#7fc0ff');
+            gradient.addColorStop(1, '#b3d9ff');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            const time = performance.now() / 3000;
+            for (let i = 0; i < 6; i++) {
+                const cx = ((i * 160 + time * 40) % 1000) - 100;
+                const cy = 30 + (i * 23) % 70;
+                ctx.fillRect(cx, cy, 60, 20);
+                ctx.fillRect(cx + 20, cy - 12, 30, 16);
+                ctx.fillRect(cx + 10, cy + 10, 40, 12);
+            }
+
+            // Платформы
+            for (let p of platforms) {
+                if (p.isStart) {
+                    ctx.fillStyle = '#6a9e6a';
+                } else if (p.isTrap) {
+                    ctx.fillStyle = '#8b3a3a';
+                } else {
+                    ctx.fillStyle = p.color || '#8b7a5a';
+                }
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                for (let i = 0; i < p.width; i += 8) {
+                    ctx.fillRect(p.x + i, p.y, 2, p.height);
+                }
+                ctx.fillStyle = 'rgba(255,255,200,0.3)';
+                ctx.fillRect(p.x, p.y, p.width, 3);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(p.x, p.y + p.height - 3, p.width, 3);
+
+                if (p.isStart) {
+                    ctx.fillStyle = '#7cfc7c';
+                    ctx.font = '18px "Courier New"';
+                    ctx.fillText('▶ СТАРТ', p.x + 6, p.y - 10);
+                }
+
+                if (p.isTrap) {
+                    ctx.fillStyle = '#ff4444';
+                    ctx.font = '16px "Courier New"';
+                    ctx.fillText('⚠', p.x + p.width/2 - 8, p.y - 8);
+                }
+
+                if (p.isFinish) {
+                    ctx.fillStyle = '#f7d44a';
+                    ctx.font = '24px "Courier New"';
+                    ctx.fillText('⭐', p.x + p.width/2 - 16, p.y - 10);
+                }
+            }
+
+            // Эффект рывка (след)
+            if (dashEffectTimer > 0) {
+                const alpha = dashEffectTimer / 20;
+                ctx.fillStyle = `rgba(100, 200, 255, ${alpha * 0.6})`;
+                ctx.fillRect(player.x - DASH_DISTANCE + 10, player.y, player.width, player.height);
+                ctx.fillStyle = `rgba(100, 200, 255, ${alpha * 0.3})`;
+                ctx.fillRect(player.x - DASH_DISTANCE + 5, player.y + 4, player.width - 10, player.height - 8);
+            }
+
+            // Игрок
+            const px = player.x, py = player.y, size = player.width;
+            
+            if (dashAvailable) {
+                ctx.shadowColor = '#7cfc7c';
+                ctx.shadowBlur = 8;
+            } else {
+                ctx.shadowColor = '#ff6666';
+                ctx.shadowBlur = 5;
+            }
+            
+            ctx.fillStyle = '#3eb5f0';
+            ctx.fillRect(px, py, size, size);
+            ctx.shadowBlur = 0;
+            
+            ctx.strokeStyle = '#1a4a6b';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(px, py, size, size);
+
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(px + 4, py + 4, 6, 6);
+            ctx.fillRect(px + 14, py + 4, 6, 6);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(px + 6, py + 6, 3, 3);
+            ctx.fillRect(px + 16, py + 6, 3, 3);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(px + 8, py + 14, 8, 3);
+            ctx.fillStyle = '#3d8c40';
+            ctx.fillRect(px, py, size, 4);
+            ctx.fillRect(px, py+4, 3, 4);
+            ctx.fillRect(px+size-3, py+4, 3, 4);
+
+            if (player.jumpsLeft > 0 && !gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(px + 4, py - 22, 18, 16);
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px "Courier New"';
+                ctx.fillText('×' + player.jumpsLeft, px + 7, py - 10);
+            }
+
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(px + size - 24, py - 22, 20, 16);
+            ctx.fillStyle = dashAvailable ? '#7cfc7c' : '#ff6666';
+            ctx.font = '12px "Courier New"';
+            ctx.fillText('F', px + size - 18, py - 10);
+
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(10, 10, 200, 40);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 22px "Courier New"';
+            ctx.fillText('SCORE: ' + Math.floor(score), 20, 42);
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(650, 10, 140, 30);
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px "Courier New"';
+            const level = Math.min(Math.floor(platformCounter / 15) + 1, 10);
+            ctx.fillText('Уровень ' + level, 660, 32);
+
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(10, 55, 180, 25);
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px "Courier New"';
+            ctx.fillText('Пробел/клик — прыжок | F — рывок', 18, 73);
+
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.font = 'bold 44px "Courier New"';
+                ctx.textAlign = 'center';
+
+                let isWin = false;
+                for (let p of platforms) {
+                    if (p.isFinish && 
+                        player.x + player.width > p.x + 4 &&
+                        player.x < p.x + p.width - 4 &&
+                        Math.abs(player.y + player.height - p.y) < 8) {
+                        isWin = true;
+                        break;
+                    }
+                }
+                ctx.fillText(isWin ? '🎉 ПОБЕДА!' : '💀 GAME OVER', canvas.width/2, 180);
+                ctx.font = '24px "Courier New"';
+                ctx.fillText('Нажми "Рестарт"', canvas.width/2, 260);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // --- Цикл ---
+        function gameLoop() {
+            if (!gameOver) {
+                updateGame();
+            }
+            draw();
+            frameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Прыжок ---
+        function jump() {
+            if (gameOver) return;
+            
+            if (player.jumpsLeft > 0) {
+                const jumpForce = (player.jumpsLeft === MAX_JUMPS) ? JUMP_FORCE : DOUBLE_JUMP_FORCE;
+                
+                let onGround = false;
+                if (player.jumpsLeft === MAX_JUMPS) {
+                    for (let p of platforms) {
+                        if (player.x + player.width > p.x + 4 &&
+                            player.x < p.x + p.width - 4 &&
+                            Math.abs(player.y + player.height - p.y) < 8) {
+                            onGround = true;
+                            break;
+                        }
+                    }
+                    if (onGround) {
+                        player.vy = jumpForce;
+                        player.jumpsLeft--;
+                        updateJumpUI();
+                        return;
+                    }
+                }
+                
+                if (player.jumpsLeft < MAX_JUMPS) {
+                    player.vy = jumpForce;
+                    player.jumpsLeft--;
+                    updateJumpUI();
+                    
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(player.x + player.width/2, player.y + player.height/2, 20, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // --- Обработчики ---
+        function handleKey(e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                jump();
+            }
+            if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                dash();
+            }
+        }
+
+        function handleClick(e) {
+            e.preventDefault();
+            jump();
+        }
+
+        function resetGame() {
+            if (frameId) cancelAnimationFrame(frameId);
+            initGame();
+            gameLoop();
+        }
+
+        // --- Старт ---
+        initGame();
+        gameLoop();
+
+        window.addEventListener('keydown', handleKey);
+        canvas.addEventListener('click', handleClick);
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' || e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (frameId) cancelAnimationFrame(frameId);
+        });
+    })();
+</script>
+</body>
+</html>
