@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Защита деревни: Новое управление</title>
+    <title>Защита деревни: Прокрутка выбора</title>
     <style>
         :root { --pixel-size: 3px; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -31,6 +31,7 @@
         .class-cards { display: flex; gap: 50px; flex-wrap: wrap; justify-content: center; }
         .class-card { background: #2a2a2a; border: 4px solid #555; border-radius: 8px; padding: 25px; text-align: center; cursor: pointer; transition: 0.2s; width: 220px; position: relative; }
         .class-card:hover { border-color: #ffd700; transform: scale(1.05); box-shadow: 0 0 25px rgba(255,215,0,0.5); }
+        .class-card.selected { border-color: #ffd700 !important; box-shadow: 0 0 25px rgba(255,215,0,0.7) !important; }
         .class-card.locked { opacity: 0.7; cursor: not-allowed; }
         .class-card.locked:hover { border-color: #f44; transform: none; box-shadow: 0 0 15px rgba(255,0,0,0.3); }
         .class-card .avatar { font-size: 80px; margin-bottom: 15px; }
@@ -207,8 +208,8 @@
     let isMouseDown = false;
     let healthBonus = 0, breadReduction = 0;
     let unlockedCharacters = { steve: true, mage: false, sukuna: false, choso: false, mahito: false, gunsmith: false, dragon: false };
+    let selectedClassIndex = 0;
 
-    // Клавиши движения
     let keyA = false, keyD = false, keyJump = false;
 
     let slashCooldown = 0, cleaveCooldown = 0, worldSlashCooldown = 0;
@@ -474,14 +475,12 @@
         if(dragonRageCooldown>0) dragonRageCooldown--;
         if(shakeAmount>0) shakeAmount*=0.85;
 
-        // Движение A/D
         let dx = 0;
         if (keyA) dx -= moveSpeed;
         if (keyD) dx += moveSpeed;
         playerX += dx;
         playerX = Math.max(60, Math.min(W-60, playerX));
 
-        // Гравитация и прыжок
         playerVY += gravity;
         playerY += playerVY;
         if (playerY >= groundY) {
@@ -646,17 +645,28 @@
             { cls:'mahito', name:'Махито', avatar:'👤', price:500, locked:!unlockedCharacters.mahito },
             { cls:'dragon', name:'Дракон', avatar:'🐉', price:9999, locked:!unlockedCharacters.dragon, codeOnly:true }
         ];
-        heroes.forEach(h => {
+
+        heroes.forEach((h, index) => {
             const card = document.createElement('div');
-            card.className = 'class-card' + (h.locked?' locked':'');
+            card.className = 'class-card' + (h.locked?' locked':'') + (index === selectedClassIndex ? ' selected' : '');
             card.innerHTML = `<div class="avatar">${h.avatar}</div><h2>${h.name}</h2>`;
             if(h.locked) {
                 if(h.codeOnly) card.innerHTML += `<div class="price-tag">КОД</div><p style="color:#ccc;font-size:12px;">Промокод DRAGON</p>`;
                 else card.innerHTML += `<div class="price-tag">${h.price}🪙</div><button class="buy-character-btn" data-cls="${h.cls}">Купить</button>`;
-            } else card.addEventListener('click', ()=> startGameWithClass(h.cls));
+            }
+            card.addEventListener('click', (e) => {
+                if (!h.locked) startGameWithClass(h.cls);
+                e.stopPropagation();
+            });
+            card.addEventListener('mouseenter', () => {
+                selectedClassIndex = index;
+                renderClassSelection();
+            });
             cards.appendChild(card);
         });
+
         classSelect.appendChild(cards);
+
         document.querySelectorAll('.buy-character-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -666,6 +676,14 @@
             });
         });
     }
+
+    classSelect.addEventListener('wheel', (e) => {
+        if (classSelect.style.display !== 'flex') return;
+        e.preventDefault();
+        const heroesCount = 7;
+        selectedClassIndex = (selectedClassIndex + (e.deltaY > 0 ? 1 : -1) + heroesCount) % heroesCount;
+        renderClassSelection();
+    }, { passive: false });
 
     const audio = new Audio(); audio.loop = true; audio.volume = 0.5; audio.src = 'toby-fox-battle.mp3';
     let musicEnabled = false;
@@ -695,6 +713,13 @@
     container.addEventListener('mouseup', e=>{ if(e.button===0) isMouseDown=false; });
     container.addEventListener('contextmenu', e=>e.preventDefault());
     document.addEventListener('keydown', e=>{
+        if(e.code==='Enter' && classSelect.style.display === 'flex') {
+            e.preventDefault();
+            const heroes = ['steve','gunsmith','mage','sukuna','choso','mahito','dragon'];
+            const cls = heroes[selectedClassIndex];
+            if (!unlockedCharacters[cls]) return;
+            startGameWithClass(cls);
+        }
         if(e.code==='KeyA'){ e.preventDefault(); keyA = true; }
         if(e.code==='KeyD'){ e.preventDefault(); keyD = true; }
         if(e.code==='Space'){ e.preventDefault(); keyJump = true; }
