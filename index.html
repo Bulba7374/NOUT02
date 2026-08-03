@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Защита деревни: Дракон</title>
+    <title>Защита деревни: Новое управление</title>
     <style>
         :root { --pixel-size: 3px; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -140,6 +140,7 @@
             <input type="number" id="wave-input" class="admin-input" min="1" value="1">
             <button class="admin-btn" id="set-wave">Перейти</button>
         </div>
+        <button class="admin-btn" id="unlock-all">Разблокировать всё</button>
         <button class="menu-btn" id="close-admin">ЗАКРЫТЬ</button>
     </div>
 </div>
@@ -178,7 +179,15 @@
     let maxHealth = 10, health = 10;
     let score = 0, wave = 1, coins = 0;
     let gameOver = false;
-    let mouseX = W/2, mouseY = H/2, playerX = W/2, playerY = H-80;
+    let mouseX = W/2, mouseY = H/2;
+    let playerX = W/2, playerY = H-80;
+    let playerVY = 0;
+    let isOnGround = true;
+    const groundY = H - 80;
+    const moveSpeed = 5;
+    const jumpPower = -12;
+    const gravity = 0.6;
+
     let shootCooldown = 0;
     let currentSkillIndex = 0;
     let skillNames = [];
@@ -198,6 +207,9 @@
     let isMouseDown = false;
     let healthBonus = 0, breadReduction = 0;
     let unlockedCharacters = { steve: true, mage: false, sukuna: false, choso: false, mahito: false, gunsmith: false, dragon: false };
+
+    // Клавиши движения
+    let keyA = false, keyD = false, keyJump = false;
 
     let slashCooldown = 0, cleaveCooldown = 0, worldSlashCooldown = 0;
     let sukunaCharging = false, sukunaChargeTimer = 0;
@@ -259,20 +271,17 @@
         if (wave === 5 || wave === 10) spawnBoss(); else boss = null;
     }
 
-    function adminSpawnMob() {
-        const type = document.getElementById('mob-select').value;
-        if (type === 'boss') { wave = 5; spawnBoss(); }
-        else if (type === 'dragon') { wave = 10; spawnBoss(); }
-        else { mobs.push(createMob(type)); }
-    }
+    function adminSpawnMob() { const type = document.getElementById('mob-select').value; if (type === 'boss') { wave = 5; spawnBoss(); } else if (type === 'dragon') { wave = 10; spawnBoss(); } else { mobs.push(createMob(type)); } }
     function adminGiveCoins() { coins += 100; updateCoinsDisplay(); }
     function adminToggleGod() { godMode = !godMode; document.getElementById('toggle-god').textContent = 'Бессмертие: ' + (godMode ? 'ВКЛ' : 'ВЫКЛ'); }
     function adminSetWave() { const newWave = parseInt(document.getElementById('wave-input').value) || 1; wave = newWave; waveDisplay.textContent = 'ВОЛНА ' + wave; spawnWave(); }
+    function adminUnlockAll() { for (let k in unlockedCharacters) unlockedCharacters[k] = true; updateCoinsDisplay(); if (classSelect.style.display === 'flex') renderClassSelection(); }
 
     document.getElementById('spawn-mob').addEventListener('click', adminSpawnMob);
     document.getElementById('give-coins').addEventListener('click', adminGiveCoins);
     document.getElementById('toggle-god').addEventListener('click', adminToggleGod);
     document.getElementById('set-wave').addEventListener('click', adminSetWave);
+    document.getElementById('unlock-all').addEventListener('click', adminUnlockAll);
     document.getElementById('close-admin').addEventListener('click', () => { adminMenu.style.display = 'none'; });
     document.addEventListener('keydown', (e) => { if (e.key === 'p' || e.key === 'P') { e.preventDefault(); adminMenu.style.display = adminMenu.style.display === 'flex' ? 'none' : 'flex'; } });
 
@@ -313,13 +322,13 @@
         }
     }
 
+    function castTeleport() { if(mahitoTeleportCooldown>0) return; mahitoTeleportCooldown = mahitoTeleportMax; shakeAmount = 8; for(let i=0;i<10;i++) particles.push({ x:playerX, y:playerY, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:10, color:'#cc44cc', size:3 }); playerX = mouseX; playerY = Math.max(60, Math.min(H-60, mouseY)); for(let i=mobs.length-1;i>=0;i--){ const m = mobs[i]; if(Math.hypot(m.x-playerX, m.y-playerY) < 60) { m.hp -= 2; if(m.hp <= 0) { createExplosion(m.x, m.y, m.color, 15); score += m.points; mobs.splice(i,1); } } } shootCooldown = 10; }
     function castDragonBreath() { if(dragonBreathCooldown>0) return; dragonBreathCooldown=dragonBreathMax; shootCooldown=10; const dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1; for(let i=0;i<5;i++) redSpells.push({ x:playerX, y:playerY-10, vx:dx/dist*12, vy:dy/dist*12+(i-2)*2, life:40, color:'#ff44ff', size:6 }); }
     function castShadowRift() { if(shadowRiftCooldown>0) return; shadowRiftCooldown=shadowRiftMax; shootCooldown=20; shakeAmount=6; blueVortexes.push({ x:mouseX, y:mouseY, radius:80, duration:180, tickTimer:0, tickInterval:30 }); }
     function castWingStorm() { if(wingStormCooldown>0) return; wingStormCooldown=wingStormMax; shootCooldown=30; shakeAmount=10; for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<120){ m.hp-=2; m.x+=(m.x-playerX)*0.5; m.y+=(m.y-playerY)*0.5; } } }
     function castDragonCrystals() { if(dragonCrystalsCooldown>0) return; dragonCrystalsCooldown=dragonCrystalsMax; shootCooldown=30; for(let i=0;i<8;i++) { const angle = Math.random()*Math.PI*2; particles.push({ x:playerX+Math.cos(angle)*100, y:playerY+Math.sin(angle)*100, vx:0,vy:0, life:30, color:'#ff00ff', size:6, isCrystal:true }); } }
     function finishDragonRage() { shakeAmount=20; for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<200) m.hp-=5; } for(let i=0;i<40;i++) particles.push({ x:playerX+(Math.random()-0.5)*400, y:playerY+(Math.random()-0.5)*400, vx:0,vy:0, life:20, color:'#ff00ff', size:8 }); dragonRageCooldown=dragonRageMax; chargeBarContainer.style.display='none'; isCharging=false; }
 
-    // Ослабленные скиллы других героев (как в предыдущем ответе)
     function castRedSpell() { const dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1; redSpells.push({ x:playerX, y:playerY-10, vx:dx/dist*arrowSpeed, vy:dy/dist*arrowSpeed, life:80, trail:[] }); shootCooldown=20; shakeAmount=4; for(let i=0;i<12;i++) particles.push({ x:playerX,y:playerY-10, vx:(Math.random()-0.5)*5-dx/dist*0.3, vy:(Math.random()-0.5)*5-dy/dist*0.3, life:12+Math.random()*12, color:'#ff4d4d', size:2+Math.random()*4 }); }
     function castBlueVortex() { blueVortexes.push({ x:mouseX, y:mouseY, radius:70, duration:240, tickTimer:0, tickInterval:60 }); shootCooldown=90; shakeAmount=6; for(let i=0;i<20;i++){ const a=Math.random()*Math.PI*2, sp=3+Math.random()*6; particles.push({ x:mouseX,y:mouseY, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:15+Math.random()*20, color:'#4da6ff', size:3+Math.random()*6 }); } }
     function castPurpleBeam() { const dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1; const dirX=dx/dist, dirY=dy/dist, beamLength=1000; for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<35){ m.hp-=3; createExplosion(m.x,m.y,m.color,25); score+=m.points; scoreDisplay.textContent='⚔ '+score; mobs.splice(i,1); } } for(let i=0;i<30;i++) particles.push({ x:playerX+dirX*(i/30)*beamLength, y:playerY+dirY*(i/30)*beamLength, vx:0,vy:0, life:20, color:'#b44dff', size:4+Math.random()*6 }); shakeAmount=15; purpleCooldown=purpleCooldownMax; }
@@ -332,7 +341,6 @@
     function convertMob(m) { if (shouldConvert()) { createAlliedMob(m); mobs.splice(mobs.indexOf(m),1); score += m.points; } else { createExplosion(m.x, m.y, m.color, 20); mobs.splice(mobs.indexOf(m),1); score += m.points; } }
     function castDistortion() { if(mahitoDistortionCooldown>0) return; mahitoDistortionCooldown = mahitoDistortionMax; shootCooldown=15; let closest=null, closestDist=Infinity; for(let m of mobs){ const d=Math.hypot(m.x-playerX,m.y-playerY); if(d<closestDist && d<400){ closest=m; closestDist=d; } } if(closest){ const dx=closest.x-playerX, dy=closest.y-playerY, dist=Math.hypot(dx,dy)||1; redSpells.push({ x:playerX, y:playerY-10, vx:dx/dist*8, vy:dy/dist*8, life:100, trail:[], color:'#cc44cc', size:6, isTransfigure:true }); } }
     function castTransfigure() { if(mahitoTransfigureCooldown>0) return; mahitoTransfigureCooldown=mahitoTransfigureMax; shootCooldown=15; const dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1; redSpells.push({ x:playerX, y:playerY-10, vx:dx/dist*12, vy:dy/dist*12, life:60, trail:[], color:'#cc44cc', size:8, isTransfigure:true }); }
-    function castTeleport() { if(mahitoTeleportCooldown>0) return; mahitoTeleportCooldown=mahitoTeleportMax; shakeAmount=10; for(let i=0;i<15;i++) particles.push({ x:playerX,y:playerY,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:15,color:'#cc44cc',size:4 }); playerX=mouseX; playerY=Math.max(60,Math.min(H-60,mouseY)); for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<60){ m.hp-=1; if(m.hp<=0) { createAlliedMob(m); mobs.splice(i,1); score+=m.points; } } } shootCooldown=10; }
     function castSoulStrike() { if(mahitoSoulCooldown>0) return; mahitoSoulCooldown=mahitoSoulMax; shootCooldown=25; shakeAmount=7; const dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1; const dirX=dx/dist, dirY=dy/dist; for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<35){ m.hp-=2; m.x+=dirX*80; m.y+=dirY*80; if(m.hp<=0) { createAlliedMob(m); mobs.splice(i,1); score+=m.points; } } } for(let i=0;i<15;i++) particles.push({ x:playerX+dirX*i*20, y:playerY+dirY*i*20, vx:0,vy:0, life:10, color:'#cc44cc', size:5 }); }
     function finishMahitoDomain() { shakeAmount=15; for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if(Math.hypot(m.x-playerX,m.y-playerY)<180){ createAlliedMob(m); mobs.splice(i,1); } } addFloatingText(playerX,playerY-30,'🌑 Территория!','#cc44cc'); mahitoDomainCooldown=mahitoDomainMax; chargeBarContainer.style.display='none'; isCharging=false; }
 
@@ -347,7 +355,7 @@
     function addFloatingText(x,y,text,color='#fff'){ floatingTexts.push({x,y,text,life:30,color,vy:-3}); }
     function damagePlayer(amount) { if(gameOver || godMode) return; health-=amount; shakeAmount=Math.max(shakeAmount,12); for(let i=0;i<15;i++) particles.push({x:playerX,y:playerY,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:10+Math.random()*10,color:'#f44',size:3+Math.random()*5}); addFloatingText(playerX,playerY-20,'-'+amount,'#ff4444'); if(health<=0){ health=0; endGame(); } updateHearts(); }
     function endGame(){ gameOver=true; gameOverScreen.style.display='block'; finalScoreEl.textContent='Счёт: '+score; finalWaveEl.textContent='Волна: '+wave; finalCoinsEl.textContent='Монет: '+coins; crosshair.style.display='none'; chargeBarContainer.style.display='none'; quitBtn.style.display='none'; }
-    function resetGameState(){ score=0; wave=1; health=maxHealth; gameOver=false; shootCooldown=0; shakeAmount=0; breadCooldown=0; meleeCooldown=0; purpleCooldown=0; slashCooldown=0; cleaveCooldown=0; worldSlashCooldown=0; chosoBurstCooldown=0; mahitoDistortionCooldown=0; mahitoTransfigureCooldown=0; mahitoDomainCooldown=0; mahitoTeleportCooldown=0; mahitoSoulCooldown=0; rifleCooldown=0; shotgunCooldown=0; grenadeCooldown=0; rpgCooldown=0; mineCooldown=0; dragonBreathCooldown=0; shadowRiftCooldown=0; wingStormCooldown=0; dragonCrystalsCooldown=0; dragonRageCooldown=0; isCharging=false; chargeTimer=0; sukunaCharging=false; sukunaChargeTimer=0; chargeBarContainer.style.display='none'; chargeBarFill.style.background = '#b44dff'; mobs=[]; redSpells=[]; blueVortexes=[]; arrows=[]; particles=[]; floatingTexts=[]; alliedMobs=[]; mines=[]; boss=null; scoreDisplay.textContent='⚔ 0'; waveDisplay.textContent='ВОЛНА 1'; updateCoinsDisplay(); updateHearts(); }
+    function resetGameState(){ score=0; wave=1; health=maxHealth; gameOver=false; shootCooldown=0; shakeAmount=0; breadCooldown=0; meleeCooldown=0; purpleCooldown=0; slashCooldown=0; cleaveCooldown=0; worldSlashCooldown=0; chosoBurstCooldown=0; mahitoDistortionCooldown=0; mahitoTransfigureCooldown=0; mahitoDomainCooldown=0; mahitoTeleportCooldown=0; mahitoSoulCooldown=0; rifleCooldown=0; shotgunCooldown=0; grenadeCooldown=0; rpgCooldown=0; mineCooldown=0; dragonBreathCooldown=0; shadowRiftCooldown=0; wingStormCooldown=0; dragonCrystalsCooldown=0; dragonRageCooldown=0; isCharging=false; chargeTimer=0; sukunaCharging=false; sukunaChargeTimer=0; chargeBarContainer.style.display='none'; chargeBarFill.style.background = '#b44dff'; mobs=[]; redSpells=[]; blueVortexes=[]; arrows=[]; particles=[]; floatingTexts=[]; alliedMobs=[]; mines=[]; boss=null; playerVY=0; isOnGround=true; scoreDisplay.textContent='⚔ 0'; waveDisplay.textContent='ВОЛНА 1'; updateCoinsDisplay(); updateHearts(); }
     function restartGame(){ resetGameState(); gameOverScreen.style.display='none'; crosshair.style.display='block'; quitBtn.style.display='block'; spawnWave(); }
     function goToMainMenu(){ playerClass=null; gameOver=false; mainMenu.style.display='flex'; shopScreen.style.display='none'; promoScreen.style.display='none'; classSelect.style.display='none'; gameOverScreen.style.display='none'; crosshair.style.display='none'; chargeBarContainer.style.display='none'; quitBtn.style.display='none'; hotbar.innerHTML=''; spellIndicator.textContent=''; score=0; wave=1; mobs=[]; alliedMobs=[]; redSpells=[]; blueVortexes=[]; arrows=[]; particles=[]; floatingTexts=[]; mines=[]; boss=null; }
     function startGameWithClass(cls){ if(!unlockedCharacters[cls]) return; playerClass=cls; classSelect.style.display='none'; crosshair.style.display='block'; quitBtn.style.display='block'; maxHealth=10+healthBonus; health=maxHealth; breadCooldownMax=7200-breadReduction; if(breadCooldownMax<600) breadCooldownMax=600; setupUIForClass(); resetGameState(); spawnWave(); }
@@ -466,6 +474,28 @@
         if(dragonRageCooldown>0) dragonRageCooldown--;
         if(shakeAmount>0) shakeAmount*=0.85;
 
+        // Движение A/D
+        let dx = 0;
+        if (keyA) dx -= moveSpeed;
+        if (keyD) dx += moveSpeed;
+        playerX += dx;
+        playerX = Math.max(60, Math.min(W-60, playerX));
+
+        // Гравитация и прыжок
+        playerVY += gravity;
+        playerY += playerVY;
+        if (playerY >= groundY) {
+            playerY = groundY;
+            playerVY = 0;
+            isOnGround = true;
+        } else {
+            isOnGround = false;
+        }
+        if (keyJump && isOnGround) {
+            playerVY = jumpPower;
+            isOnGround = false;
+        }
+
         if (isCharging) {
             if (!isMouseDown) { isCharging=false; chargeBarContainer.style.display='none'; }
             else { chargeTimer++; chargeBarFill.style.width=(chargeTimer/currentChargeMax*100)+'%'; if(chargeTimer>=currentChargeMax){ isCharging=false; chargeBarContainer.style.display='none'; if(playerClass==='mage') castPurpleBeam(); else if(playerClass==='sukuna') castWorldSlash(); else if(playerClass==='choso') castBloodBurst(); else if(playerClass==='mahito') finishMahitoDomain(); else if(playerClass==='gunsmith' && currentSkillIndex===3) finishRPG(); else if(playerClass==='dragon' && currentSkillIndex===4) finishDragonRage(); } }
@@ -473,11 +503,6 @@
         if (sukunaCharging) {
             if (!isMouseDown) { sukunaCharging=false; chargeBarContainer.style.display='none'; }
             else { sukunaChargeTimer++; chargeBarFill.style.width=(sukunaChargeTimer/sukunaChargeMax*100)+'%'; if(sukunaChargeTimer>=sukunaChargeMax){ sukunaCharging=false; chargeBarContainer.style.display='none'; castWorldSlash(); } }
-        }
-
-        if (!isCharging && !sukunaCharging) {
-            playerX += (mouseX - playerX)*0.08;
-            playerX = Math.max(60, Math.min(W-60, playerX));
         }
 
         if (boss) {
@@ -661,7 +686,6 @@
         const code = document.getElementById('promo-input').value.trim().toUpperCase();
         const msg = document.getElementById('promo-msg');
         if(code==='MONEY'){ coins+=50; updateCoinsDisplay(); msg.textContent='✅ +50 монет!'; msg.style.color='#0f0'; }
-        else if(code==='FREEALL'){ for(let k in unlockedCharacters) unlockedCharacters[k]=true; msg.textContent='✅ Все открыты!'; msg.style.color='#0f0'; renderClassSelection(); }
         else if(code==='DRAGON'){ unlockedCharacters.dragon=true; msg.textContent='✅ Дракон разблокирован!'; msg.style.color='#ff00ff'; renderClassSelection(); }
         else { msg.textContent='❌ Неверный код'; msg.style.color='#f44'; }
     });
@@ -671,11 +695,17 @@
     container.addEventListener('mouseup', e=>{ if(e.button===0) isMouseDown=false; });
     container.addEventListener('contextmenu', e=>e.preventDefault());
     document.addEventListener('keydown', e=>{
-        if(e.code==='Space'){ e.preventDefault(); isMouseDown=true; if(playerClass) useAbility(); }
+        if(e.code==='KeyA'){ e.preventDefault(); keyA = true; }
+        if(e.code==='KeyD'){ e.preventDefault(); keyD = true; }
+        if(e.code==='Space'){ e.preventDefault(); keyJump = true; }
         if(e.code==='KeyR' && gameOver) restartGame();
         if(e.key>='1' && e.key<='5') { currentSkillIndex = parseInt(e.key)-1; if(currentSkillIndex >= skillNames.length) currentSkillIndex = 0; updateHotbar(); }
     });
-    document.addEventListener('keyup', e=>{ if(e.code==='Space') isMouseDown=false; });
+    document.addEventListener('keyup', e=>{
+        if(e.code==='KeyA'){ e.preventDefault(); keyA = false; }
+        if(e.code==='KeyD'){ e.preventDefault(); keyD = false; }
+        if(e.code==='Space'){ e.preventDefault(); keyJump = false; }
+    });
     document.getElementById('restart-btn').addEventListener('click', restartGame);
     document.getElementById('menu-btn').addEventListener('click', ()=>{ gameOverScreen.style.display='none'; goToMainMenu(); });
     updateCoinsDisplay();
