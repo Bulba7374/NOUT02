@@ -44,6 +44,7 @@
             border-bottom:6px solid #444; font-family:'Courier New',monospace; font-weight:bold; letter-spacing:2px;
             border-radius:8px; width:200px; text-align:center; text-shadow:1px 1px 0 #000;
         }
+        .menu-btn.install-btn { background:#2d2d2d; border-color:#ffd700; color:#ffd700; }
         .buy-btn { background:#5a5; border-color:#3a3; }
         .buy-btn:disabled { background:#555; border-color:#333; opacity:0.6; }
         .class-cards { display:flex; gap:15px; flex-wrap:wrap; justify-content:center; max-width:800px; }
@@ -71,8 +72,11 @@
         #charge-bar-fill { height:100%; width:0%; background:#b44dff; border-radius:3px; transition:width 0.05s linear; }
         #spell-indicator { position:absolute; top:95px; left:50%; transform:translateX(-50%); color:#fff; font-size:14px; background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:8px; }
         #install-prompt {
-            position:absolute; bottom:120px; left:50%; transform:translateX(-50%); background:#2a2a2a; color:#fff; padding:10px 20px; border-radius:8px; z-index:50; cursor:pointer; font-family:'Courier New',monospace; display:none;
-            border:2px solid #ffd700;
+            position:absolute; bottom:120px; left:50%; transform:translateX(-50%); background:#2a2a2a; color:#ffd700; padding:10px 20px; border-radius:8px; z-index:50; cursor:pointer; font-family:'Courier New',monospace; display:none;
+            border:2px solid #ffd700; font-weight:bold;
+        }
+        #ios-hint {
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.9); color:#fff; padding:15px; border-radius:10px; z-index:60; display:none; text-align:center; font-size:14px; max-width:250px;
         }
     </style>
 </head>
@@ -89,6 +93,7 @@
         <div class="menu-btn" id="play-btn">▶ ИГРАТЬ</div>
         <div class="menu-btn" id="shop-btn">🛒 МАГАЗИН</div>
         <div class="menu-btn" id="promo-btn">🎫 ПРОМОКОДЫ</div>
+        <div class="menu-btn install-btn" id="install-menu-btn">📲 Установить игру</div>
         <button class="menu-btn" id="music-toggle">🔇 ВКЛЮЧИТЬ МУЗЫКУ</button>
     </div>
     <div id="shop-screen" style="display:none"><h2>МАГАЗИН 🪙 <span id="shop-coins">0</span></h2><div class="shop-item"><span>+1 макс. здоровье (20🪙)</span><button class="buy-btn" id="buy-health">Купить</button></div><div class="shop-item"><span>⌛ Хлеб быстрее на 60с (30🪙)</span><button class="buy-btn" id="buy-bread">Купить</button></div><button class="menu-btn" id="shop-back">↩ НАЗАД</button></div>
@@ -106,12 +111,14 @@
     <button id="quit-btn" style="display:none">✖ Выйти</button>
     <button id="fullscreen-btn" style="position:absolute; top:10px; right:10px; z-index:50;">🔲</button>
     <div id="install-prompt">📲 Установить игру</div>
+    <div id="ios-hint">Нажмите кнопку «Поделиться» (↓) и выберите «На экран „Домой“»</div>
 </div>
 
 <script>
 (function() {
     // ========== PWA SETUP ==========
     function setupPWA() {
+        // Иконка
         const iconCanvas = document.createElement('canvas');
         iconCanvas.width = 512; iconCanvas.height = 512;
         const ictx = iconCanvas.getContext('2d');
@@ -139,8 +146,9 @@
         linkEl.rel = 'manifest'; linkEl.href = manifestUrl;
         document.head.appendChild(linkEl);
 
+        // Service Worker
         const swCode = `
-            const CACHE_NAME = 'village-defense-v3';
+            const CACHE_NAME = 'village-defense-v4';
             self.addEventListener('install', e => {
                 e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
             });
@@ -154,23 +162,60 @@
             navigator.serviceWorker.register(swUrl, { scope: './' });
         }
 
+        // Кнопки установки
         let deferredPrompt;
-        const installBtn = document.getElementById('install-prompt');
+        const installMenuBtn = document.getElementById('install-menu-btn');
+        const installPrompt = document.getElementById('install-prompt');
+        const iosHint = document.getElementById('ios-hint');
+
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            installBtn.style.display = 'block';
-            installBtn.addEventListener('click', () => {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then(() => {
-                    deferredPrompt = null;
-                    installBtn.style.display = 'none';
-                });
-            });
+            installMenuBtn.style.display = 'block';
+            installPrompt.style.display = 'block';
         });
+
+        function showInstallPrompt() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('PWA установлена');
+                    }
+                    deferredPrompt = null;
+                    installMenuBtn.style.display = 'none';
+                    installPrompt.style.display = 'none';
+                });
+            } else if (isIOS()) {
+                // Показать подсказку для iOS
+                iosHint.style.display = 'block';
+                setTimeout(() => { iosHint.style.display = 'none'; }, 4000);
+            } else {
+                alert('Установка недоступна. Используйте меню браузера или откройте сайт в Chrome.');
+            }
+        }
+
+        installMenuBtn.addEventListener('click', showInstallPrompt);
+        installPrompt.addEventListener('click', showInstallPrompt);
+
+        // Скрываем кнопки, если не поддерживается
+        if (!window.matchMedia('(display-mode: standalone)').matches) {
+            // Показываем кнопку в меню всегда (даже если beforeinstallprompt не сработал)
+            installMenuBtn.style.display = 'block';
+        } else {
+            installMenuBtn.style.display = 'none';
+        }
     }
 
     // ========== ИГРОВОЙ КОД (полный) ==========
+    // (Вставлен тот же полный код игры, что и в предыдущем ответе, с механиками, способностями, UI и т.д.)
+    // ... весь JavaScript-код игры, который был в прошлом сообщении ...
+    // Здесь я дублирую его полностью для целостности.
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = 900, H = 600;
