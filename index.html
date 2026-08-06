@@ -32,12 +32,12 @@
         .ctrl-btn:active { background:rgba(255,255,255,0.35); }
         #btn-jump { width:65px; height:65px; font-size:28px; }
 
-        /* Показывать мобильные кнопки только на экранах шириной меньше 900px */
+        /* Показывать мобильные кнопки только на маленьких экранах */
         @media (min-width: 900px) {
             #mobile-controls { display:none; }
         }
 
-        /* Остальные стили интерфейса */
+        /* Интерфейс */
         #main-menu, #shop-screen, #promo-screen, #class-select-screen, #game-over-screen, #admin-menu {
             position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:100;
             display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:20px;
@@ -436,7 +436,6 @@
         const skillId = CLASSES[playerClass].skillIds[currentSkillIndex];
         const ab = ABILITIES[playerClass][skillId];
         if(!ab) return;
-
         if(ab.charge) {
             isCharging=true; chargeTimer=0; currentChargeMax=ab.chargeMax;
             chargeType=ab.chargeType;
@@ -445,12 +444,9 @@
             document.getElementById('charge-bar-fill').style.background = ab.chargeType==='purple'?'#b44dff':'#ff4444';
             return;
         }
-
         if(ab.ext && cd[ab.ext]>0) return;
         if(!ab.ext && cd[ab.key]>0) return;
-
         if(ab.cast) ab.cast();
-
         if(ab.ext) cd[ab.ext] = ab.cd;
         else cd[ab.key] = ab.cd;
         cd.shoot = ab.cd;
@@ -461,20 +457,17 @@
         if(wave===5) boss = { type:'cube', x:W/2, y:100, hp:60, maxHp:60, size:50, color:'#ff8800', phase:1, shootTimer:0, shootDelay:40, wallTimer:0, wallDuration:150, wallsActive:false, spikeUnderTimer:0, spikeUnderDelay:70, waveActive:false, waveY:-30, spawnAnim:30 };
         else if(wave===10) boss = { type:'dragon', x:W/2, y:80, hp:120, maxHp:120, size:60, color:'#222222', shootTimer:0, shootDelay:30, flameTimer:0, flameActive:false, diveTimer:0, diveActive:false, diveTargetX:0, spawnAnim:30 };
     }
-
     function spawnWave() {
         waveTotalMobs = 4 + wave * 3;
         waveMobsRemaining = waveTotalMobs;
         mobSpawnDelay = Math.max(20, 80 - wave * 4);
-        mobSpawnTimer = 0;
-        waveTransition = false; waveTransitionTimer = 0;
+        mobSpawnTimer = 0; waveTransition = false; waveTransitionTimer = 0;
         mobs=[]; redSpells=[]; blueVortexes=[]; arrows=[]; particles=[]; floatingTexts=[]; alliedMobs=[]; mines=[];
         if(wave===5 || wave===10) spawnBoss(); else boss=null;
     }
-
     let waveTotalMobs, waveMobsRemaining, mobSpawnDelay, mobSpawnTimer=0, waveTransition=false, waveTransitionTimer=0;
 
-    // ========== UI И КЛАССЫ ==========
+    // ========== UI ==========
     function setupUIForClass() {
         const cls = CLASSES[playerClass];
         skillNames = cls.skills;
@@ -489,28 +482,25 @@
             slot.addEventListener('click', ()=>{ currentSkillIndex=i; updateHotbar(); });
             hotbarEl.appendChild(slot);
         });
-        currentSkillIndex=0;
-        updateHotbar();
+        currentSkillIndex=0; updateHotbar();
         document.getElementById('spell-indicator').textContent = cls.skills[0];
     }
-
     function updateHotbar() {
         document.querySelectorAll('.hotbar-slot').forEach((s,i)=> s.classList.toggle('active', i===currentSkillIndex));
         if(skillNames.length) document.getElementById('spell-indicator').textContent = skillNames[currentSkillIndex];
     }
-
     function renderClassSelection() {
         const screen = document.getElementById('class-select-screen');
         screen.innerHTML = '<h1>ВЫБЕРИТЕ ГЕРОЯ</h1><div class="class-cards"></div>';
         const cards = screen.querySelector('.class-cards');
         const heroes = [
-            { cls:'steve',    name:'Стив',   avatar:'🧑', price:0 },
+            { cls:'steve', name:'Стив', avatar:'🧑', price:0 },
             { cls:'gunsmith', name:'Оружейник', avatar:'🔫', price:200 },
-            { cls:'sukuna',   name:'Сукуна', avatar:'👹', price:75 },
-            { cls:'mage',     name:'Годжо',  avatar:'🧙', price:50 },
-            { cls:'choso',    name:'Чосо',   avatar:'🩸', price:333 },
-            { cls:'mahito',   name:'Махито', avatar:'👤', price:500 },
-            { cls:'dragon',   name:'Дракон', avatar:'🐉', price:9999, codeOnly:true }
+            { cls:'sukuna', name:'Сукуна', avatar:'👹', price:75 },
+            { cls:'mage', name:'Годжо', avatar:'🧙', price:50 },
+            { cls:'choso', name:'Чосо', avatar:'🩸', price:333 },
+            { cls:'mahito', name:'Махито', avatar:'👤', price:500 },
+            { cls:'dragon', name:'Дракон', avatar:'🐉', price:9999, codeOnly:true }
         ];
         heroes.forEach(h=>{
             const card = document.createElement('div');
@@ -531,7 +521,6 @@
             });
         });
     }
-
     function startGameWithClass(cls) {
         playerClass = cls;
         document.getElementById('class-select-screen').style.display='none';
@@ -544,18 +533,133 @@
 
     // ========== ГЛАВНЫЙ ЦИКЛ ==========
     function decreaseCooldowns() { for(let k in cd) if(cd[k]>0) cd[k]--; if(shakeAmount>0) shakeAmount*=0.85; }
-    function handlePlayerMovement() { /* стандартное движение */ }
-    function handleCharging() { /* зарядка */ }
-    function updateBoss() { /* обновление босса */ }
-    function spawnMobsLogic() { /* спавн мобов */ }
-    function checkWaveTransition() { /* переход волн */ }
-    function updateProjectiles() { /* обновление снарядов */ }
-    function updateVortexes() { /* вихри */ }
-    function updateMines() { /* мины */ }
-    function updateMobs() { /* поведение мобов */ }
-    function updateAlliedMobs() { /* союзники */ }
-    function processEnemyProjectiles() { /* вражеские снаряды */ }
-    function updateParticlesAndTexts() { /* частицы и текст */ }
+    function handlePlayerMovement() {
+        let dx=0;
+        if(keyA) dx-=MOVE_SPEED; if(keyD) dx+=MOVE_SPEED;
+        playerX += dx; playerX = Math.max(60, Math.min(W-60, playerX));
+        playerVY += GRAVITY; playerY += playerVY;
+        if(playerY >= GROUND_Y){ playerY=GROUND_Y; playerVY=0; isOnGround=true; }
+        else isOnGround=false;
+        if(keyJump && isOnGround){ playerVY=JUMP_POWER; isOnGround=false; }
+    }
+    function handleCharging() {
+        if(!isCharging) return;
+        if(!isMouseDown) { isCharging=false; chargeType=null; document.getElementById('charge-bar-container').style.display='none'; return; }
+        chargeTimer++;
+        document.getElementById('charge-bar-fill').style.width = (chargeTimer/currentChargeMax*100)+'%';
+        if(chargeTimer >= currentChargeMax) finishCharge();
+    }
+    function updateBoss() {
+        if(!boss) return;
+        if(boss.spawnAnim>0) boss.spawnAnim--;
+        if(boss.type==='cube') {
+            boss.shootTimer++; if(boss.shootTimer>=boss.shootDelay){ boss.shootTimer=0; let a=Math.atan2(playerY-boss.y,playerX-boss.x); redSpells.push({x:boss.x,y:boss.y,vx:Math.cos(a)*5,vy:Math.sin(a)*5,life:100,color:'#ff4400',isEnemy:true,size:6,trail:[]}); }
+            if(boss.hp<=30 && boss.phase===1){ boss.phase=2; boss.wallsActive=true; boss.wallTimer=boss.wallDuration; addFloatingText(boss.x,boss.y-40,'Фаза 2!','#ff8800'); }
+            if(boss.phase===2){
+                if(boss.wallsActive){ boss.wallTimer--; if(boss.wallTimer<=0){ boss.wallsActive=false; boss.wallTimer=boss.wallDuration; } }
+                boss.spikeUnderTimer++; if(boss.spikeUnderTimer>=boss.spikeUnderDelay){ boss.spikeUnderTimer=0; for(let i=0;i<3;i++) particles.push({x:playerX+(i-1)*25,y:playerY+20,vx:0,vy:-8,life:25,color:'#ff6600',size:5,isEnemy:true}); }
+                if(!boss.waveActive && Math.random()<0.02){ boss.waveActive=true; boss.waveY=0; }
+            }
+            if(boss.waveActive){ boss.waveY+=3; if(boss.waveY>H) boss.waveActive=false; }
+        } else if(boss.type==='dragon') {
+            boss.shootTimer++; if(boss.shootTimer>=boss.shootDelay){ boss.shootTimer=0; let a=Math.atan2(playerY-boss.y,playerX-boss.x); redSpells.push({x:boss.x,y:boss.y,vx:Math.cos(a)*6,vy:Math.sin(a)*6,life:80,color:'#ff00ff',isEnemy:true,size:8,trail:[]}); }
+            boss.flameTimer++; if(boss.flameTimer>=180){ boss.flameActive=true; boss.flameTimer=0; } if(boss.flameActive){ boss.flameTimer++; if(boss.flameTimer<60) for(let i=0;i<3;i++) particles.push({x:boss.x+Math.random()*100-50,y:boss.y+40,vx:0,vy:3,life:20,color:'#ff44ff',size:5,isEnemy:true}); else boss.flameActive=false; }
+            if(boss.hp<60 && !boss.diveActive && Math.random()<0.01){ boss.diveActive=true; boss.diveTargetX=playerX; boss.diveTimer=40; }
+            if(boss.diveActive){ boss.x+=(boss.diveTargetX-boss.x)*0.1; boss.y+=(playerY-boss.y)*0.05; boss.diveTimer--; if(boss.diveTimer<=0) boss.diveActive=false; }
+            if(!boss.diveActive){ boss.x+=(playerX-boss.x)*0.02; boss.y+=(80-boss.y)*0.02; }
+        }
+    }
+    function spawnMobsLogic() {
+        if(waveTransition || waveMobsRemaining<=0) return;
+        mobSpawnTimer++; if(mobSpawnTimer>=mobSpawnDelay){
+            mobSpawnTimer=0; const types=['zombie','creeper','skeleton','spider']; if(wave>=3) types.push('enderman');
+            mobs.push(createMob(types[Math.floor(Math.random()*types.length)]));
+            waveMobsRemaining--;
+        }
+    }
+    function checkWaveTransition() {
+        if(!waveTransition && waveMobsRemaining<=0 && mobs.length===0 && !boss){
+            waveTransition=true; waveTransitionTimer=60; wave++;
+            document.getElementById('wave-display').textContent='ВОЛНА '+wave;
+            coins+=10; updateCoinsDisplay();
+            addFloatingText(W/2,H/2,'ВОЛНА '+wave+'! +10🪙','#ffd700');
+            health=Math.min(maxHealth,health+2); updateHearts();
+        }
+        if(waveTransition){ waveTransitionTimer--; if(waveTransitionTimer<=0) spawnWave(); }
+    }
+    function updateProjectiles() {
+        const proj = playerClass==='steve'?arrows:redSpells;
+        for(let p of proj){
+            p.x+=p.vx; p.y+=p.vy; p.life--;
+            if(p.trail){ p.trail.push({x:p.x,y:p.y}); if(p.trail.length>8) p.trail.shift(); }
+            if(boss && Math.hypot(p.x-boss.x,p.y-boss.y)<30 && !p.isEnemy){
+                let dmg=1; if(p.isRPG) dmg=4; if(p.isWorldSlash) dmg=5;
+                boss.hp-=dmg; createExplosion(p.x,p.y,'#ff0',8); p.life=0;
+                if(boss.hp<=0){ score+=100; document.getElementById('score-display').textContent='⚔ '+score; createExplosion(boss.x,boss.y,boss.type==='dragon'?'#ff00ff':'#ff8800',40); boss=null; }
+            }
+            for(let i=mobs.length-1;i>=0;i--){
+                let m=mobs[i]; if(Math.hypot(p.x-m.x,p.y-m.y)<m.size/2+10){
+                    let dmg=1; if(p.isGrenade) dmg=2; if(p.isRPG) dmg=3; if(p.isWorldSlash) dmg=4;
+                    m.hp-=dmg; m.flashTimer=4;
+                    if(m.hp<=0){
+                        if(p.isTransfigure){ createAlliedMob(m); mobs.splice(i,1); score+=m.points; }
+                        else { createExplosion(m.x,m.y,m.color,25); score+=m.points; mobs.splice(i,1); }
+                        document.getElementById('score-display').textContent='⚔ '+score;
+                    }
+                    createExplosion(p.x,p.y,'#ff4d4d',12); p.life=0; break;
+                }
+            }
+        }
+        if(playerClass==='steve') arrows=arrows.filter(a=>a.life>0); else redSpells=redSpells.filter(s=>s.life>0);
+    }
+    function updateVortexes() {
+        for(let v of blueVortexes){
+            v.duration--; v.tickTimer++;
+            mobs.forEach(m=>{ let dx=v.x-m.x,dy=v.y-m.y,dist=Math.hypot(dx,dy); if(dist<v.radius){ let f=0.15*(1-dist/v.radius); m.x+=dx/dist*f*3; m.y+=dy/dist*f*3; } });
+            if(v.tickTimer>=v.tickInterval){ v.tickTimer=0; for(let i=mobs.length-1;i>=0;i--){ let m=mobs[i]; if(Math.hypot(v.x-m.x,v.y-m.y)<v.radius){ m.hp-=1; if(m.hp<=0){ createExplosion(m.x,m.y,m.color,25); score+=m.points; mobs.splice(i,1); } } } }
+        }
+        blueVortexes=blueVortexes.filter(v=>v.duration>0);
+    }
+    function updateMines() {
+        for(let mine of mines){
+            if(mine.timer>0){ mine.timer--; continue; }
+            if(!mine.armed){ mine.armed=true; continue; }
+            for(let m of mobs){ if(Math.hypot(m.x-mine.x,m.y-mine.y)<mine.radius){ createExplosion(mine.x,mine.y,'#ffaa00',20); m.hp-=mine.damage; if(m.hp<=0){ createExplosion(m.x,m.y,m.color,15); score+=m.points; mobs=mobs.filter(x=>x!==m); } mine.exploded=true; break; } }
+        }
+        mines=mines.filter(m=>!m.exploded);
+    }
+    function updateMobs() {
+        mobs.forEach(m=>{
+            if(m.spawnAnim>0) m.spawnAnim--;
+            let dx=playerX-m.x, dy=playerY-m.y, dist=Math.hypot(dx,dy);
+            m.walkPhase+=0.15; m.x+=dx/dist*m.speed; m.y+=dy/dist*m.speed;
+            if(dist<35 && !gameOver){
+                if(m.explodes){ createExplosion(m.x,m.y,'#5d9b3a',40); damagePlayer(m.damage); m.hp=0; shakeAmount=20; }
+                else { damagePlayer(m.damage); m.x-=dx/dist*40; m.y-=dy/dist*40; }
+            }
+            if(m.shoots){ m.shootTimer++; if(m.shootTimer>=m.shootDelay && dist<400){ m.shootTimer=0; let ep={x:m.x,y:m.y,vx:dx/dist*ARROW_SPEED*0.7,vy:dy/dist*ARROW_SPEED*0.7,life:60,trail:[],isEnemy:true}; if(playerClass==='steve') arrows.push(ep); else redSpells.push(ep); } }
+        });
+        mobs=mobs.filter(m=>m.hp>0);
+    }
+    function updateAlliedMobs() {
+        alliedMobs.forEach(a=>{
+            a.life--; if(a.life<=0) return;
+            a.walkPhase+=0.15; let target=null,cdist=Infinity;
+            for(let m of mobs){ let d=Math.hypot(a.x-m.x,a.y-m.y); if(d<cdist){ cdist=d; target=m; } }
+            if(target){ let dx=target.x-a.x,dy=target.y-a.y,dist=Math.hypot(dx,dy)||1; a.x+=dx/dist*a.speed; a.y+=dy/dist*a.speed; if(dist<25){ target.hp-=a.damage; if(target.hp<=0){ createExplosion(target.x,target.y,target.color,15); score+=target.points; mobs=mobs.filter(m=>m!==target); } } }
+        });
+        alliedMobs=alliedMobs.filter(a=>a.life>0);
+    }
+    function processEnemyProjectiles() {
+        const enemyProj = playerClass==='steve'?arrows.filter(a=>a.isEnemy):redSpells.filter(s=>s.isEnemy);
+        enemyProj.forEach(ep=>{ if(Math.hypot(ep.x-playerX,ep.y-playerY)<22){ damagePlayer(1); ep.life=0; createExplosion(ep.x,ep.y,'#f44',8); } });
+    }
+    function updateParticlesAndTexts() {
+        particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.life--; if(!p.isFlash) p.vy+=0.2; p.size*=0.96; });
+        particles=particles.filter(p=>p.life>0);
+        floatingTexts.forEach(ft=>{ ft.y+=ft.vy; ft.life--; });
+        floatingTexts=floatingTexts.filter(ft=>ft.life>0);
+    }
 
     function update() {
         if(gameOver||!playerClass) return;
@@ -575,10 +679,25 @@
         updateParticlesAndTexts();
     }
 
-    // ========== ОТРИСОВКА (упрощённая) ==========
-    function drawBackground() { ctx.fillStyle='#7ec8f8'; ctx.fillRect(0,0,W,H); }
-    function drawMob(m) { /* отрисовка моба */ }
-    function drawPlayer() { /* отрисовка игрока */ }
+    // ========== ОТРИСОВКА ==========
+    function drawBackground() {
+        const grad=ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,'#7ec8f8'); grad.addColorStop(0.55,'#b8e0fc'); grad.addColorStop(1,'#c8e8ff');
+        ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+    }
+    function drawMob(mob) {
+        ctx.save(); let x=Math.floor(mob.x), y=Math.floor(mob.y), s=mob.size;
+        let wobX=Math.sin(frameCount*0.15+mob.wobble)*3, wobY=Math.cos(frameCount*0.12+mob.wobble)*2;
+        ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(x-s/2+3,y+s/2-4,s-2,6);
+        let bc=mob.flashTimer>0?'#fff':mob.color; if(mob.flashTimer>0) mob.flashTimer--;
+        ctx.fillStyle=bc; ctx.fillRect(x-s/2,y-s/2,s,s);
+        if(mob.hp<mob.maxHp){ let bw=s,bh=4,by=y-s/2-10; ctx.fillStyle='#333'; ctx.fillRect(x-bw/2,by,bw,bh); ctx.fillStyle=mob.hp>0?'#5f5':'#f55'; ctx.fillRect(x-bw/2,by,bw*(mob.hp/mob.maxHp),bh); }
+        ctx.restore();
+    }
+    function drawPlayer() {
+        let px=playerX, py=playerY;
+        ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(px-16,py+14,32,8);
+        ctx.fillStyle='#4d7cb8'; ctx.fillRect(px-10,py-18,20,28);
+    }
     function draw() {
         ctx.clearRect(0,0,W,H);
         let sx=0,sy=0; if(shakeAmount>0.5){ sx=(Math.random()-0.5)*shakeAmount*2; sy=(Math.random()-0.5)*shakeAmount*2; }
@@ -588,20 +707,14 @@
         drawPlayer();
         ctx.restore();
     }
-
     function gameLoop() { if(playerClass) { update(); draw(); } requestAnimationFrame(gameLoop); }
 
-    // ========== НОВОЕ МОБИЛЬНОЕ УПРАВЛЕНИЕ (pointer events) ==========
+    // ========== СЕНСОРНОЕ УПРАВЛЕНИЕ (pointer events) ==========
     const container = document.getElementById('game-container');
+    function isControlElement(target) { return target.closest('.ctrl-btn'); }
 
-    function isControlElement(target) {
-        // Проверяем, является ли цель кнопкой управления или её потомком
-        return target.closest('.ctrl-btn');
-    }
-
-    // Прицеливание и стрельба (для канваса и контейнера)
     container.addEventListener('pointerdown', (e) => {
-        if (isControlElement(e.target)) return; // игнорируем нажатия на кнопки
+        if (isControlElement(e.target)) return;
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         mouseX = (e.clientX - rect.left) * (W / rect.width);
@@ -609,7 +722,6 @@
         isMouseDown = true;
         useAbility();
     });
-
     container.addEventListener('pointermove', (e) => {
         if (isControlElement(e.target)) return;
         e.preventDefault();
@@ -619,37 +731,57 @@
         document.getElementById('crosshair').style.left = (e.clientX - rect.left) + 'px';
         document.getElementById('crosshair').style.top = (e.clientY - rect.top) + 'px';
     });
-
     container.addEventListener('pointerup', (e) => {
         if (isControlElement(e.target)) return;
         isMouseDown = false;
     });
+    container.addEventListener('pointerleave', () => { isMouseDown = false; });
 
-    container.addEventListener('pointerleave', (e) => {
-        isMouseDown = false;
-    });
-
-    // Кнопки движения через pointerdown/pointerup
+    // Кнопки движения
     function setupMobileButtons() {
         const btnLeft = document.getElementById('btn-left');
         const btnRight = document.getElementById('btn-right');
         const btnJump = document.getElementById('btn-jump');
-
         btnLeft.addEventListener('pointerdown', (e) => { e.preventDefault(); keyA = true; });
         btnLeft.addEventListener('pointerup', (e) => { e.preventDefault(); keyA = false; });
-        btnLeft.addEventListener('pointerleave', (e) => { keyA = false; });
-
+        btnLeft.addEventListener('pointerleave', () => { keyA = false; });
         btnRight.addEventListener('pointerdown', (e) => { e.preventDefault(); keyD = true; });
         btnRight.addEventListener('pointerup', (e) => { e.preventDefault(); keyD = false; });
-        btnRight.addEventListener('pointerleave', (e) => { keyD = false; });
-
+        btnRight.addEventListener('pointerleave', () => { keyD = false; });
         btnJump.addEventListener('pointerdown', (e) => { e.preventDefault(); keyJump = true; });
         btnJump.addEventListener('pointerup', (e) => { e.preventDefault(); keyJump = false; });
-        btnJump.addEventListener('pointerleave', (e) => { keyJump = false; });
+        btnJump.addEventListener('pointerleave', () => { keyJump = false; });
     }
 
-    // Инициализация
+    // ========== ИНИЦИАЛИЗАЦИЯ ==========
     setupMobileButtons();
+
+    // Обработчики интерфейса
+    document.getElementById('play-btn').onclick=()=>{ document.getElementById('main-menu').style.display='none'; renderClassSelection(); document.getElementById('class-select-screen').style.display='flex'; };
+    document.getElementById('shop-btn').onclick=()=>{ document.getElementById('main-menu').style.display='none'; document.getElementById('shop-screen').style.display='flex'; updateCoinsDisplay(); };
+    document.getElementById('shop-back').onclick=()=>{ document.getElementById('shop-screen').style.display='none'; document.getElementById('main-menu').style.display='flex'; };
+    document.getElementById('promo-btn').onclick=()=>{ document.getElementById('main-menu').style.display='none'; document.getElementById('promo-screen').style.display='flex'; };
+    document.getElementById('promo-back').onclick=()=>{ document.getElementById('promo-screen').style.display='none'; document.getElementById('main-menu').style.display='flex'; };
+    document.getElementById('apply-promo').onclick=()=>{ let code=document.getElementById('promo-input').value.trim().toUpperCase(); if(code==='MONEY'){ coins+=50; updateCoinsDisplay(); document.getElementById('promo-msg').textContent='✅ +50 монет!'; } else if(code==='DRAGON'){ unlockedCharacters.dragon=true; document.getElementById('promo-msg').textContent='✅ Дракон разблокирован!'; } else document.getElementById('promo-msg').textContent='❌ Неверный код'; };
+    document.getElementById('quit-btn').onclick=goToMainMenu;
+    document.getElementById('fullscreen-btn').onclick=()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+    document.addEventListener('keydown', e=>{
+        if(e.key==='p'||e.key==='P'){ e.preventDefault(); let adm=document.getElementById('admin-menu'); adm.style.display=adm.style.display==='flex'?'none':'flex'; }
+        if(e.code==='KeyA') keyA=true; if(e.code==='KeyD') keyD=true; if(e.code==='Space'){ e.preventDefault(); keyJump=true; }
+        if(e.key>='1'&&e.key<='5'&&playerClass){ let idx=parseInt(e.key)-1; if(idx<skillNames.length){ currentSkillIndex=idx; updateHotbar(); } }
+    });
+    document.addEventListener('keyup', e=>{ if(e.code==='KeyA') keyA=false; if(e.code==='KeyD') keyD=false; if(e.code==='Space'){ e.preventDefault(); keyJump=false; } });
+    document.getElementById('restart-btn').onclick=restartGame;
+    document.getElementById('menu-btn').onclick=()=>{ document.getElementById('game-over-screen').style.display='none'; goToMainMenu(); };
+
+    // Админ-меню
+    document.getElementById('spawn-mob').onclick=()=>{ let t=document.getElementById('mob-select').value; if(t==='boss'){ wave=5; spawnBoss(); } else if(t==='dragon'){ wave=10; spawnBoss(); } else mobs.push(createMob(t)); };
+    document.getElementById('give-coins').onclick=()=>{ coins+=100; updateCoinsDisplay(); };
+    document.getElementById('toggle-god').onclick=()=>{ godMode=!godMode; document.getElementById('toggle-god').textContent='Бессмертие: '+(godMode?'ВКЛ':'ВЫКЛ'); };
+    document.getElementById('set-wave').onclick=()=>{ wave=parseInt(document.getElementById('wave-input').value)||1; document.getElementById('wave-display').textContent='ВОЛНА '+wave; spawnWave(); };
+    document.getElementById('unlock-all').onclick=()=>{ for(let k in unlockedCharacters) unlockedCharacters[k]=true; renderClassSelection(); };
+    document.getElementById('close-admin').onclick=()=>{ document.getElementById('admin-menu').style.display='none'; };
+
     updateCoinsDisplay();
     gameLoop();
 })();
