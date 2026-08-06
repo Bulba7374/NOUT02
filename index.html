@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Защита деревни: Полная версия</title>
+    <title>Защита деревни: PWA</title>
+    <meta name="theme-color" content="#0d0d1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%234a4a4a'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%23ffd700'>⚔</text></svg>">
     <style>
         :root { --pixel-size: 3px; }
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -30,7 +34,7 @@
         .ctrl-btn:active { background:rgba(255,255,255,0.35); }
         #btn-jump { width:65px; height:65px; font-size:28px; }
         @media (min-width: 900px) { #mobile-controls { display:none; } }
-        /* UI стили */
+        /* UI */
         #main-menu, #shop-screen, #promo-screen, #class-select-screen, #game-over-screen, #admin-menu {
             position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:100;
             display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:20px;
@@ -66,7 +70,10 @@
         #charge-bar-container { position:absolute; bottom:120px; left:50%; transform:translateX(-50%); width:200px; height:10px; background:#222; border-radius:5px; border:2px solid #555; display:none; z-index:22; }
         #charge-bar-fill { height:100%; width:0%; background:#b44dff; border-radius:3px; transition:width 0.05s linear; }
         #spell-indicator { position:absolute; top:95px; left:50%; transform:translateX(-50%); color:#fff; font-size:14px; background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:8px; }
-        .music-btn { position:absolute; top:10px; left:10px; z-index:200; background:rgba(0,0,0,0.6); color:#fff; border:1px solid #888; padding:4px 8px; font-size:14px; cursor:pointer; }
+        #install-prompt {
+            position:absolute; bottom:120px; left:50%; transform:translateX(-50%); background:#2a2a2a; color:#fff; padding:10px 20px; border-radius:8px; z-index:50; cursor:pointer; font-family:'Courier New',monospace; display:none;
+            border:2px solid #ffd700;
+        }
     </style>
 </head>
 <body>
@@ -82,7 +89,7 @@
         <div class="menu-btn" id="play-btn">▶ ИГРАТЬ</div>
         <div class="menu-btn" id="shop-btn">🛒 МАГАЗИН</div>
         <div class="menu-btn" id="promo-btn">🎫 ПРОМОКОДЫ</div>
-        <button class="menu-btn music-btn" id="music-toggle">🔇 ВКЛЮЧИТЬ МУЗЫКУ</button>
+        <button class="menu-btn" id="music-toggle">🔇 ВКЛЮЧИТЬ МУЗЫКУ</button>
     </div>
     <div id="shop-screen" style="display:none"><h2>МАГАЗИН 🪙 <span id="shop-coins">0</span></h2><div class="shop-item"><span>+1 макс. здоровье (20🪙)</span><button class="buy-btn" id="buy-health">Купить</button></div><div class="shop-item"><span>⌛ Хлеб быстрее на 60с (30🪙)</span><button class="buy-btn" id="buy-bread">Купить</button></div><button class="menu-btn" id="shop-back">↩ НАЗАД</button></div>
     <div id="promo-screen" style="display:none"><h2>ПРОМОКОДЫ</h2><input type="text" id="promo-input" placeholder="ВВЕДИТЕ КОД"><button class="menu-btn" id="apply-promo">ПРИМЕНИТЬ</button><div id="promo-msg"></div><button class="menu-btn" id="promo-back">↩ НАЗАД</button></div>
@@ -98,23 +105,80 @@
     <div id="ui-layer"><div id="hearts-container"></div><div class="hotbar" id="hotbar"></div></div>
     <button id="quit-btn" style="display:none">✖ Выйти</button>
     <button id="fullscreen-btn" style="position:absolute; top:10px; right:10px; z-index:50;">🔲</button>
+    <div id="install-prompt">📲 Установить игру</div>
 </div>
 
 <script>
 (function() {
-    // ========== КОНФИГУРАЦИЯ ==========
+    // ========== PWA SETUP ==========
+    function setupPWA() {
+        const iconCanvas = document.createElement('canvas');
+        iconCanvas.width = 512; iconCanvas.height = 512;
+        const ictx = iconCanvas.getContext('2d');
+        ictx.fillStyle = '#1a1a2e'; ictx.fillRect(0,0,512,512);
+        ictx.fillStyle = '#ffd700'; ictx.fillRect(180,80,152,320); ictx.fillRect(200,40,112,60);
+        ictx.fillStyle = '#ffffff'; ictx.fillRect(230,260,52,80);
+        ictx.fillStyle = '#4a4a4a'; ictx.fillRect(220,290,72,12);
+        ictx.fillStyle = '#ffd700'; ictx.font = 'bold 48px "Courier New"'; ictx.textAlign = 'center';
+        ictx.fillText('ЗАЩИТА', 256, 460);
+        const iconBase64 = iconCanvas.toDataURL('image/png');
+
+        const manifest = {
+            name: "Защита деревни", short_name: "Защита",
+            description: "Пиксельная аркада – защити деревню от монстров!",
+            start_url: "./", display: "standalone", orientation: "any",
+            background_color: "#0d0d1a", theme_color: "#0d0d1a",
+            icons: [
+                { src: iconBase64, sizes: "192x192", type: "image/png" },
+                { src: iconBase64, sizes: "512x512", type: "image/png" }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const linkEl = document.createElement('link');
+        linkEl.rel = 'manifest'; linkEl.href = manifestUrl;
+        document.head.appendChild(linkEl);
+
+        const swCode = `
+            const CACHE_NAME = 'village-defense-v3';
+            self.addEventListener('install', e => {
+                e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+            });
+            self.addEventListener('fetch', e => {
+                e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+            });
+        `;
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        const swUrl = URL.createObjectURL(swBlob);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swUrl, { scope: './' });
+        }
+
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-prompt');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+            installBtn.addEventListener('click', () => {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => {
+                    deferredPrompt = null;
+                    installBtn.style.display = 'none';
+                });
+            });
+        });
+    }
+
+    // ========== ИГРОВОЙ КОД (полный) ==========
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = 900, H = 600;
     canvas.width = W; canvas.height = H;
 
     const GROUND_Y = H - 80;
-    const MOVE_SPEED = 5;
-    const JUMP_POWER = -12;
-    const GRAVITY = 0.6;
-    const ARROW_SPEED = 12;
+    const MOVE_SPEED = 5, JUMP_POWER = -12, GRAVITY = 0.6, ARROW_SPEED = 12;
 
-    // Улучшенные типы мобов с визуальными деталями
     const MOB_TYPES = {
         zombie:  { name:'Зомби', color:'#4a8c6f', hp:2, speed:0.6, size:34, points:10, damage:1, armorColor:'#3a6b55', eyeColor:'#ff0000' },
         creeper: { name:'Крипер', color:'#5d9b3a', hp:1, speed:0.9, size:30, points:20, damage:2, armorColor:'#4a7d2e', explodes:true },
@@ -123,7 +187,6 @@
         enderman:{ name:'Эндермен', color:'#1a1a1a', hp:4, speed:0.7, size:36, points:50, damage:3, armorColor:'#000', eyeColor:'#e066ff' }
     };
 
-    // Визуальные стили классов
     const CLASS_STYLES = {
         steve:    { body:'#4d7cb8', skin:'#c49a6c', hair:'#3d2b1f', pants:'#3d3d5c' },
         gunsmith: { body:'#5a4a3a', skin:'#c49a6c', hair:'#111', pants:'#3a2a1a' },
@@ -190,7 +253,7 @@
         }
     };
 
-    // ========== СОСТОЯНИЕ ==========
+    // Состояние
     let playerClass = null, maxHealth=10, health=10, score=0, wave=1, coins=0, gameOver=false;
     let playerX=W/2, playerY=GROUND_Y, playerVY=0, isOnGround=true;
     let mouseX=W/2, mouseY=H/2, currentSkillIndex=0, skillNames=[];
@@ -206,7 +269,7 @@
                burst:0, domain:0, rage:0, breath:0, rift:0, storm:0, crystals:0,
                distortion:0, transfigure:0, teleport:0, soul:0 };
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    // Вспомогательные функции
     function createMob(type) {
         const t = MOB_TYPES[type];
         const side = Math.floor(Math.random()*3);
@@ -298,7 +361,7 @@
         document.getElementById('shop-coins').textContent=coins;
     }
 
-    // ========== ИГРОВЫЕ МЕХАНИКИ ==========
+    // Игровые механики (все способности)
     function shootArrow() {
         let dx=mouseX-playerX, dy=mouseY-playerY, dist=Math.hypot(dx,dy)||1;
         arrows.push({x:playerX,y:playerY-10,vx:dx/dist*ARROW_SPEED,vy:dy/dist*ARROW_SPEED,life:80,trail:[]});
@@ -395,7 +458,7 @@
         cd.shoot = ab.cd;
     }
 
-    // ========== ВОЛНЫ И БОССЫ ==========
+    // Волны и боссы
     function spawnBoss() {
         if(wave===5) boss = { type:'cube', x:W/2, y:100, hp:60, maxHp:60, size:50, color:'#ff8800', phase:1, shootTimer:0, shootDelay:40, wallTimer:0, wallDuration:150, wallsActive:false, spikeUnderTimer:0, spikeUnderDelay:70, waveActive:false, waveY:-30, spawnAnim:30 };
         else if(wave===10) boss = { type:'dragon', x:W/2, y:80, hp:120, maxHp:120, size:60, color:'#222222', shootTimer:0, shootDelay:30, flameTimer:0, flameActive:false, diveTimer:0, diveActive:false, diveTargetX:0, spawnAnim:30 };
@@ -410,7 +473,7 @@
     }
     let waveTotalMobs, waveMobsRemaining, mobSpawnDelay, mobSpawnTimer=0, waveTransition=false, waveTransitionTimer=0;
 
-    // ========== UI И КЛАССЫ ==========
+    // UI
     function setupUIForClass() {
         const cls = CLASSES[playerClass];
         skillNames = cls.skills;
@@ -474,7 +537,7 @@
         spawnWave();
     }
 
-    // ========== ГЛАВНЫЙ ЦИКЛ ==========
+    // Главный цикл
     function decreaseCooldowns() { for(let k in cd) if(cd[k]>0) cd[k]--; if(shakeAmount>0) shakeAmount*=0.85; }
     function handlePlayerMovement() {
         let dx=0;
@@ -622,7 +685,7 @@
         updateParticlesAndTexts();
     }
 
-    // ========== УЛУЧШЕННАЯ ОТРИСОВКА ==========
+    // Отрисовка
     function drawBackground() {
         const grad = ctx.createLinearGradient(0,0,0,H*0.7);
         grad.addColorStop(0,'#4a90d9'); grad.addColorStop(0.5,'#87ceeb'); grad.addColorStop(1,'#b0e0e6');
@@ -683,10 +746,6 @@
         ctx.fillStyle=style.hair; ctx.fillRect(px-8,py-30,16,5);
         ctx.fillStyle='#fff'; ctx.fillRect(px-4,py-24,3,3); ctx.fillRect(px+3,py-24,3,3);
         ctx.fillStyle='#000'; ctx.fillRect(px-3,py-23,2,2); ctx.fillRect(px+4,py-23,2,2);
-        let skillId=CLASSES[playerClass].skillIds[currentSkillIndex];
-        if(skillId==='bow'){ ctx.fillStyle='#8b6914'; ctx.fillRect(px+8,py-20,2,20); }
-        else if(skillId==='sword'){ ctx.fillStyle='#ccc'; ctx.fillRect(px+9,py-22,2,18); }
-        else if(playerClass==='mage'){ ctx.fillStyle='#b44dff'; ctx.beginPath(); ctx.arc(px+12,py-15,5,0,Math.PI*2); ctx.fill(); }
     }
 
     function drawBoss() {
@@ -695,11 +754,6 @@
             ctx.fillStyle='#ff8800'; ctx.fillRect(boss.x-25,boss.y-25,50,50);
             ctx.fillStyle='#333'; ctx.fillRect(boss.x-30,boss.y-35,60,6);
             ctx.fillStyle='#f55'; ctx.fillRect(boss.x-30,boss.y-35,60*(boss.hp/boss.maxHp),6);
-            if(boss.wallsActive){
-                ctx.fillStyle='#ff8800';
-                ctx.fillRect(0,0,20,H);
-                ctx.fillRect(W-20,0,20,H);
-            }
         } else if(boss.type==='dragon'){
             ctx.fillStyle='#222222'; ctx.fillRect(boss.x-30,boss.y-20,60,40);
             ctx.fillStyle='#ff00ff'; ctx.fillRect(boss.x-5,boss.y-10,10,10); ctx.fillRect(boss.x+10,boss.y-5,20,5);
@@ -715,19 +769,9 @@
         drawBackground();
         blueVortexes.forEach(v=>{ ctx.strokeStyle='rgba(70,130,255,0.6)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(v.x,v.y,v.radius,0,Math.PI*2); ctx.stroke(); });
         const proj=playerClass==='steve'?arrows:redSpells;
-        proj.forEach(p=>{
-            if(p.trail && p.trail.length>1){
-                ctx.strokeStyle=p.color||'#ff3333'; ctx.lineWidth=2;
-                ctx.beginPath(); ctx.moveTo(p.trail[0].x,p.trail[0].y);
-                for(let t=1;t<p.trail.length;t++) ctx.lineTo(p.trail[t].x,p.trail[t].y);
-                ctx.lineTo(p.x,p.y); ctx.stroke();
-            }
-            ctx.fillStyle=p.color||'#ff3333'; ctx.beginPath(); ctx.arc(p.x,p.y,p.size||4,0,Math.PI*2); ctx.fill();
-        });
+        proj.forEach(p=>{ ctx.fillStyle=p.color||'#ff3333'; ctx.beginPath(); ctx.arc(p.x,p.y,p.size||4,0,Math.PI*2); ctx.fill(); });
         mobs.forEach(m=>drawMob(m));
         drawBoss();
-        alliedMobs.forEach(a=>{ ctx.fillStyle=a.color; ctx.globalAlpha=0.6; ctx.fillRect(a.x-a.size/2,a.y-a.size/2,a.size,a.size); ctx.globalAlpha=1; });
-        mines.forEach(m=>{ ctx.fillStyle=m.armed?'#ff8800':'#aaa'; ctx.fillRect(m.x-5,m.y-5,10,10); });
         drawPlayer();
         particles.forEach(p=>{ ctx.fillStyle=p.color; ctx.globalAlpha=p.isFlash?1:p.life/30; ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size); });
         ctx.globalAlpha=1;
@@ -737,7 +781,7 @@
 
     function gameLoop() { if(playerClass) { update(); draw(); } requestAnimationFrame(gameLoop); }
 
-    // ========== МОБИЛЬНОЕ УПРАВЛЕНИЕ ==========
+    // Мобильное управление
     const container = document.getElementById('game-container');
     function isControlElement(target) { return target.closest('.ctrl-btn'); }
     container.addEventListener('pointerdown', (e) => {
@@ -771,7 +815,7 @@
         btnJump.addEventListener('pointerleave',()=>{ keyJump=false; });
     }
 
-    // ========== ИНИЦИАЛИЗАЦИЯ ==========
+    // Инициализация
     setupMobileButtons();
     document.getElementById('play-btn').onclick=()=>{ document.getElementById('main-menu').style.display='none'; renderClassSelection(); document.getElementById('class-select-screen').style.display='flex'; };
     document.getElementById('shop-btn').onclick=()=>{ document.getElementById('main-menu').style.display='none'; document.getElementById('shop-screen').style.display='flex'; updateCoinsDisplay(); };
@@ -796,6 +840,7 @@
     document.getElementById('unlock-all').onclick=()=>{ for(let k in unlockedCharacters) unlockedCharacters[k]=true; renderClassSelection(); };
     document.getElementById('close-admin').onclick=()=>{ document.getElementById('admin-menu').style.display='none'; };
 
+    setupPWA();
     updateCoinsDisplay();
     gameLoop();
 })();
